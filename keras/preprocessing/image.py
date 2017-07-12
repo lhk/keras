@@ -55,6 +55,55 @@ def random_rotation(x, rg, row_axis=1, col_axis=2, channel_axis=0,
     x = apply_transform(x, transform_matrix, channel_axis, fill_mode, cval)
     return x
 
+def random_rotation_with_boxes(x, rg, boxes, row_axis=1, col_axis=2, channel_axis=0,
+                    fill_mode='nearest', cval=0.):
+    """Performs a random rotation of a Numpy image tensor. Also rotates the corresponding bounding boxes
+
+    # Arguments
+        x: Input tensor. Must be 3D.
+        rg: Rotation range, in degrees.
+        boxes: a list of bounding boxes [xmin, ymin, xmax, ymax], values in [0,1]
+        row_axis: Index of axis for rows in the input tensor.
+        col_axis: Index of axis for columns in the input tensor.
+        channel_axis: Index of axis for channels in the input tensor.
+        fill_mode: Points outside the boundaries of the input
+            are filled according to the given mode
+            (one of `{'constant', 'nearest', 'reflect', 'wrap'}`).
+        cval: Value used for points outside the boundaries
+            of the input if `mode='constant'`.
+
+    # Returns
+        Rotated Numpy image tensor.
+        And rotated bounding boxes
+    """
+
+    # sample parameter for augmentation
+    theta = np.pi / 180 * np.random.uniform(-rg, rg)
+
+    # apply to image
+    rotation_matrix = np.array([[np.cos(theta), -np.sin(theta), 0],
+                                [np.sin(theta), np.cos(theta), 0],
+                                [0, 0, 1]])
+
+    h, w = x.shape[row_axis], x.shape[col_axis]
+    transform_matrix = transform_matrix_offset_center(rotation_matrix, h, w)
+    x = apply_transform(x, transform_matrix, channel_axis, fill_mode, cval)
+
+    # apply to vertices
+    vertices = boxes_to_vertices(boxes)
+
+    vertices = vertices.reshape((-1, 2))
+
+    # apply offset to have pivot point at [0.5, 0.5]
+    vertices -= [0.5, 0.5]
+
+    # apply rotation, we only need the rotation part of the matrix
+    vertices = np.dot(vertices, rotation_matrix[:2, :2])
+    vertices += [0.5, 0.5]
+
+    boxes = vertices_to_boxes(vertices)
+
+    return x, boxes
 
 def random_shift(x, wrg, hrg, row_axis=1, col_axis=2, channel_axis=0,
                  fill_mode='nearest', cval=0.):
