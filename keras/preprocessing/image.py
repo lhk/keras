@@ -280,7 +280,7 @@ def random_zoom_with_boxes(x, boxes, zoom_range, row_axis=1, col_axis=2, channel
                          'Received arg: ', zoom_range)
 
     assert 0<zoom_range[0] and 0<zoom_range[1], "zoom can not be 0"
-    
+
     if zoom_range[0] == 1 and zoom_range[1] == 1:
         zx, zy = 1, 1
     else:
@@ -380,21 +380,14 @@ def boxes_to_vertices(boxes):
     assert len(boxes.shape) == 2, "boxes must be a 2D tensor"
     assert boxes.shape[1] == 4, "boxes must be [:, 4] tensor"
 
-    min_val = boxes.min()
-    max_val = boxes.max()
-    assert 0 <= min_val <= 1, "bounding box coordinates must be in [0,1]"
-    assert 0 <= max_val <= 1, "bounding box coordinates must be in [0,1]"
-
-    num_boxes = boxes.shape[0]
-
     # look at the four vertices of each box
     x_min = boxes[:, 0]
     y_min = boxes[:, 1]
     x_max = boxes[:, 2]
     y_max = boxes[:, 3]
 
-    assert np.all(x_min < x_max), "coordinates must be given as [xmin, ymin, xmax, ymax"
-    assert np.all(y_min < y_max), "coordinates must be given as [xmin, ymin, xmax, ymax"
+    assert np.all(x_min < x_max), "coordinates must be given as [xmin, ymin, xmax, ymax]"
+    assert np.all(y_min < y_max), "coordinates must be given as [xmin, ymin, xmax, ymax]"
 
     # create new axis to stack the x,y coordinates
     x_min = np.expand_dims(x_min, axis=-1)
