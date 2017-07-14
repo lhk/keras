@@ -104,6 +104,44 @@ def random_rotation_with_boxes(x, boxes, rg, row_axis=1, col_axis=2, channel_axi
 
     return x, boxes, vertices
 
+def random_rotation_with_vertices(x, vertices, rg, row_axis=1, col_axis=2, channel_axis=0,
+                    fill_mode='nearest', cval=0.):
+    """Performs a random rotation of a Numpy image tensor.
+    Also rotates a list of vectors
+
+    # Arguments
+        x: Input tensor. Must be 3D.
+        vertices: a list of vectors
+        rg: Rotation range, in degrees.
+        row_axis: Index of axis for rows in the input tensor.
+        col_axis: Index of axis for columns in the input tensor.
+        channel_axis: Index of axis for channels in the input tensor.
+        fill_mode: Points outside the boundaries of the input
+            are filled according to the given mode
+            (one of `{'constant', 'nearest', 'reflect', 'wrap'}`).
+        cval: Value used for points outside the boundaries
+            of the input if `mode='constant'`.
+
+    # Returns
+        Rotated Numpy image tensor.
+        And rotated vertices
+    """
+
+    # sample parameter for augmentation
+    theta = np.pi / 180 * np.random.uniform(-rg, rg)
+
+    # apply to image
+    rotation_matrix = np.array([[np.cos(theta), -np.sin(theta), 0],
+                                [np.sin(theta), np.cos(theta), 0],
+                                [0, 0, 1]])
+
+    h, w = x.shape[row_axis], x.shape[col_axis]
+    transform_matrix = transform_matrix_offset_center(rotation_matrix, h, w)
+    x = apply_transform(x, transform_matrix, channel_axis, fill_mode, cval)
+
+    vertices = np.dot(vertices, rotation_matrix[:2, :2])
+    return x, vertices
+
 def random_shift(x, wrg, hrg, row_axis=1, col_axis=2, channel_axis=0,
                  fill_mode='nearest', cval=0.):
     """Performs a random spatial shift of a Numpy image tensor.
@@ -179,7 +217,50 @@ def random_shift_with_boxes(x, boxes, wrg, hrg, row_axis=1, col_axis=2, channel_
     vertices = vertices - [shift_h, shift_w]
 
     boxes = vertices_to_boxes(vertices)
-    return x, boxes
+    return x, boxes, vertices
+
+def random_shift_with_vertices(x, vertices, wrg, hrg, row_axis=1, col_axis=2, channel_axis=0,
+                 fill_mode='nearest', cval=0.):
+    """Performs a random spatial shift of a Numpy image tensor.
+
+    # Arguments
+        x: Input tensor. Must be 3D.
+        vertices: a list of vectors
+        wrg: Width shift range, as a float fraction of the width.
+        hrg: Height shift range, as a float fraction of the height.
+        row_axis: Index of axis for rows in the input tensor.
+        col_axis: Index of axis for columns in the input tensor.
+        channel_axis: Index of axis for channels in the input tensor.
+        fill_mode: Points outside the boundaries of the input
+            are filled according to the given mode
+            (one of `{'constant', 'nearest', 'reflect', 'wrap'}`).
+        cval: Value used for points outside the boundaries
+            of the input if `mode='constant'`.
+
+    # Returns
+        Shifted Numpy image tensor.
+        And shifted vectors
+    """
+
+    # sample parameters for augmentation
+    shift_h = np.random.uniform(-hrg, hrg)
+    shift_w = np.random.uniform(-wrg, wrg)
+
+    # apply to image
+    h, w = x.shape[row_axis], x.shape[col_axis]
+    tx = shift_h * h
+    ty = shift_w * w
+    translation_matrix = np.array([[1, 0, tx],
+                                   [0, 1, ty],
+                                   [0, 0, 1]])
+
+    transform_matrix = translation_matrix  # no need to do offset
+    x = apply_transform(x, transform_matrix, channel_axis, fill_mode, cval)
+
+    # apply to vertices
+    vertices = vertices - [shift_h, shift_w]
+    return x, vertices
+
 
 def random_shear(x, intensity, row_axis=1, col_axis=2, channel_axis=0,
                  fill_mode='nearest', cval=0.):
@@ -306,6 +387,54 @@ def random_zoom_with_boxes(x, boxes, zoom_range, row_axis=1, col_axis=2, channel
 
     return x, boxes, vertices
 
+def random_zoom_with_vertices(x, vertices, zoom_range, row_axis=1, col_axis=2, channel_axis=0,
+                fill_mode='nearest', cval=0.):
+    """Performs a random spatial zoom of a Numpy image tensor.
+    Also zooms the corresponding vertices
+
+    # Arguments
+        x: Input tensor. Must be 3D.
+        vertices: a list of vertices
+        zoom_range: Tuple of floats; zoom range for width and height.
+        row_axis: Index of axis for rows in the input tensor.
+        col_axis: Index of axis for columns in the input tensor.
+        channel_axis: Index of axis for channels in the input tensor.
+        fill_mode: Points outside the boundaries of the input
+            are filled according to the given mode
+            (one of `{'constant', 'nearest', 'reflect', 'wrap'}`).
+        cval: Value used for points outside the boundaries
+            of the input if `mode='constant'`.
+
+    # Returns
+        Zoomed Numpy image tensor.
+        Zoomed bounding boxes
+
+    # Raises
+        ValueError: if `zoom_range` isn't a tuple.
+    """
+    if len(zoom_range) != 2:
+        raise ValueError('`zoom_range` should be a tuple or list of two floats. '
+                         'Received arg: ', zoom_range)
+
+    assert 0<zoom_range[0] and 0<zoom_range[1], "zoom can not be 0"
+
+    if zoom_range[0] == 1 and zoom_range[1] == 1:
+        zx, zy = 1, 1
+    else:
+        zx, zy = np.random.uniform(zoom_range[0], zoom_range[1], 2)
+    zoom_matrix = np.array([[zx, 0, 0],
+                            [0, zy, 0],
+                            [0, 0, 1]])
+
+    h, w = x.shape[row_axis], x.shape[col_axis]
+    transform_matrix = transform_matrix_offset_center(zoom_matrix, h, w)
+    x = apply_transform(x, transform_matrix, channel_axis, fill_mode, cval)
+
+    # apply to vertices
+    vertices *= [1/zx, 1/zy]
+
+    return x, vertices
+
 
 def random_channel_shift(x, intensity, channel_axis=0):
     x = np.rollaxis(x, channel_axis, 0)
@@ -366,6 +495,69 @@ def flip_axis(x, axis):
     x = x[::-1, ...]
     x = x.swapaxes(0, axis)
     return x
+
+def random_transform_with_vertices(x, vertices,
+                                   rg,
+                                   wrg,
+                                   hrg,
+                                   zoom_range,
+                                   row_axis=1, col_axis=2, channel_axis=0,
+                                   fill_mode='nearest', cval=0.):
+    """Randomly augment a single image tensor.
+       Also augments a list of vertices
+    # Arguments
+        x: 3D tensor, single image.
+        seed: random seed.
+
+    # Returns
+        A randomly transformed version of the input (same shape).
+    """
+    # x is a single image, so it doesn't have image number at index 0
+
+    # use composition of homographies
+    # to generate final transform that needs to be applied
+
+
+    # apply to image
+    h, w = x.shape[row_axis], x.shape[col_axis]
+
+    shift_x = np.random.uniform(-hrg, hrg)
+    shift_y = np.random.uniform(-wrg, wrg)
+    tx = shift_x * h
+    ty = shift_y * w
+
+    theta = np.pi / 180 * np.random.uniform(-rg, rg)
+
+    assert 0<zoom_range[0] and 0<zoom_range[1], "zoom can not be 0"
+    if zoom_range[0] == 1 and zoom_range[1] == 1:
+        zx, zy = 1, 1
+    else:
+        zx, zy = np.random.uniform(zoom_range[0], zoom_range[1], 2)
+
+
+    rotation_matrix = np.array([[np.cos(theta), -np.sin(theta), 0],
+                                [np.sin(theta), np.cos(theta), 0],
+                                [0, 0, 1]])
+    transform_matrix = rotation_matrix
+
+    shift_matrix = np.array([[1, 0, tx],
+                             [0, 1, ty],
+                             [0, 0, 1]])
+    transform_matrix = shift_matrix if transform_matrix is None else np.dot(transform_matrix, shift_matrix)
+
+    zoom_matrix = np.array([[zx, 0, 0],
+                            [0, zy, 0],
+                            [0, 0, 1]])
+    transform_matrix = zoom_matrix if transform_matrix is None else np.dot(transform_matrix, zoom_matrix)
+
+    final_matrix = transform_matrix_offset_center(transform_matrix, h, w)
+    x = apply_transform(x, final_matrix, channel_axis,
+                        fill_mode=fill_mode, cval=cval)
+
+    vertices = np.dot(vertices, rotation_matrix[:2, :2])
+    vertices = vertices - [shift_x, shift_y]
+    vertices *= [1/zx, 1/zy]
+    return x, vertices
 
 def boxes_to_vertices(boxes):
     """
