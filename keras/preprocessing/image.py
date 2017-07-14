@@ -102,7 +102,7 @@ def random_rotation_with_boxes(x, boxes, rg, row_axis=1, col_axis=2, channel_axi
 
     boxes = vertices_to_boxes(vertices)
 
-    return x, boxes
+    return x, boxes, vertices
 
 def random_shift(x, wrg, hrg, row_axis=1, col_axis=2, channel_axis=0,
                  fill_mode='nearest', cval=0.):
@@ -249,6 +249,62 @@ def random_zoom(x, zoom_range, row_axis=1, col_axis=2, channel_axis=0,
     transform_matrix = transform_matrix_offset_center(zoom_matrix, h, w)
     x = apply_transform(x, transform_matrix, channel_axis, fill_mode, cval)
     return x
+
+def random_zoom_with_boxes(x, boxes, zoom_range, row_axis=1, col_axis=2, channel_axis=0,
+                fill_mode='nearest', cval=0.):
+    """Performs a random spatial zoom of a Numpy image tensor.
+    Also zooms the corresponding bounding boxes
+
+    # Arguments
+        x: Input tensor. Must be 3D.
+        boxes. Input tensor. Must be 2D
+        zoom_range: Tuple of floats; zoom range for width and height.
+        row_axis: Index of axis for rows in the input tensor.
+        col_axis: Index of axis for columns in the input tensor.
+        channel_axis: Index of axis for channels in the input tensor.
+        fill_mode: Points outside the boundaries of the input
+            are filled according to the given mode
+            (one of `{'constant', 'nearest', 'reflect', 'wrap'}`).
+        cval: Value used for points outside the boundaries
+            of the input if `mode='constant'`.
+
+    # Returns
+        Zoomed Numpy image tensor.
+        Zoomed bounding boxes
+
+    # Raises
+        ValueError: if `zoom_range` isn't a tuple.
+    """
+    if len(zoom_range) != 2:
+        raise ValueError('`zoom_range` should be a tuple or list of two floats. '
+                         'Received arg: ', zoom_range)
+
+    assert 0<zoom_range[0] and 0<zoom_range[1], "zoom can not be 0"
+    
+    if zoom_range[0] == 1 and zoom_range[1] == 1:
+        zx, zy = 1, 1
+    else:
+        zx, zy = np.random.uniform(zoom_range[0], zoom_range[1], 2)
+    zoom_matrix = np.array([[zx, 0, 0],
+                            [0, zy, 0],
+                            [0, 0, 1]])
+
+    h, w = x.shape[row_axis], x.shape[col_axis]
+    transform_matrix = transform_matrix_offset_center(zoom_matrix, h, w)
+    x = apply_transform(x, transform_matrix, channel_axis, fill_mode, cval)
+
+    # apply to vertices
+    vertices = boxes_to_vertices(boxes)
+    vertices = vertices.reshape((-1, 2))
+
+    # apply offset to have pivot point at [0.5, 0.5]
+    vertices -= [0.5, 0.5]
+    vertices *= [1/zx, 1/zy]
+    vertices += [0.5, 0.5]
+
+    boxes = vertices_to_boxes(vertices)
+
+    return x, boxes, vertices
 
 
 def random_channel_shift(x, intensity, channel_axis=0):
