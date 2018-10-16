@@ -256,7 +256,7 @@ class TimeDistributed(Wrapper):
 
         # Apply activity regularizer if any:
         if (hasattr(self.layer, 'activity_regularizer') and
-           self.layer.activity_regularizer is not None):
+                self.layer.activity_regularizer is not None):
             regularization_loss = self.layer.activity_regularizer(y)
             self.add_loss(regularization_loss, inputs)
 
@@ -545,7 +545,7 @@ class Bidirectional(Wrapper):
 
         # Properly set learning phase
         if (getattr(y, '_uses_learning_phase', False) or
-           getattr(y_rev, '_uses_learning_phase', False)):
+                getattr(y_rev, '_uses_learning_phase', False)):
             if self.merge_mode is None:
                 for out in output:
                     out._uses_learning_phase = True
@@ -653,6 +653,7 @@ class Bidirectional(Wrapper):
         layer._num_constants = num_constants
         return layer
 
+
 class WeightDropout(Wrapper):
     """Applies dropout to the weights or a layer (instead of the activations).
 
@@ -674,7 +675,6 @@ class WeightDropout(Wrapper):
 
         self.input_spec = layer.input_spec
         self._num_constants = None
-
 
     def compute_output_shape(self, input_shape):
         output_shape = self.layer.compute_output_shape(input_shape)
@@ -713,12 +713,10 @@ class WeightDropout(Wrapper):
 
         return y
 
-
     def build(self, input_shape):
 
         if not self.layer.built:
             self.layer.build(input_shape)
             self.layer.built = True
-
 
         super(WeightDropout, self).build()
