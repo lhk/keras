@@ -652,3 +652,73 @@ class Bidirectional(Wrapper):
         layer = cls(rnn_layer, **config)
         layer._num_constants = num_constants
         return layer
+
+class WeightDropout(Wrapper):
+    """Applies dropout to the weights or a layer (instead of the activations).
+
+    # Arguments
+        layer: A layer with trainable weights.
+        rate: float between 0 and 1. Fraction of the weights to drop.
+        seed: A Python integer to use as random seed.
+
+    """
+
+    def __init__(self, layer, rate, seed, **kwargs):
+        layer = copy.copy(layer)
+        super(WeightDropout, self).__init__(layer, **kwargs)
+
+        self.rate = rate
+        self.seed = seed
+        self.supports_masking = True
+        self._trainable = True
+
+        self.input_spec = layer.input_spec
+        self._num_constants = None
+
+
+    def compute_output_shape(self, input_shape):
+        output_shape = self.layer.compute_output_shape(input_shape)
+        return output_shape
+
+    def call(self,
+             inputs,
+             mask=None,
+             training=None,
+             initial_state=None,
+             constants=None):
+
+        # pass-through of kwargs to wrapped layer
+        kwargs = {}
+        if has_arg(self.layer.call, 'training'):
+            kwargs['training'] = training
+        if has_arg(self.layer.call, 'mask'):
+            kwargs['mask'] = mask
+        if has_arg(self.layer.call, 'constants'):
+            kwargs['constants'] = constants
+
+        # overwrite the weights of the wrapped layer
+        # with new weights that are dropped out in training mode
+        dropped_weights = []
+        for weight in self.layer.weights:
+            noise_shape = K.shape(weight)
+            dropped_weight = K.dropout(weight, self.rate, noise_shape, seed=self.seed)
+            dropped_weight = K.in_train_phase(dropped_weight, weight, training=training)
+
+            dropped_weights.append(dropped_weight)
+
+        self.layer.weights = dropped_weights
+
+        # use wrapped layer for forward pass
+        y = self.layer.call(inputs, **kwargs)
+
+        return y
+
+
+    def build(self, input_shape):
+
+        if not self.layer.built:
+            self.layer.build(input_shape)
+            self.layer.built = True
+
+
+        super(WeightDropout, self).build()
