@@ -1,7 +1,14 @@
+#import sys
+# importing keras from local version
+#sys.path = ["/home/lhk/programming/keras"]+sys.path
+#sys.path = ["/home/lhk/programming/keras-applications"]+sys.path
+#sys.path = ["/home/lhk/programming/keras-preprocessing"]+sys.path
+
 import pytest
 import numpy as np
 import copy
 from numpy.testing import assert_allclose
+
 from keras.utils import CustomObjectScope
 from keras.layers import wrappers, Input, Layer
 from keras.layers import RNN
@@ -631,7 +638,6 @@ def test_Bidirectional_losses():
     assert len(layer.losses) == 8
     assert len(layer.get_losses_for(None)) == 6
     assert len(layer.get_losses_for(x)) == 2
-
 
 if __name__ == '__main__':
     pytest.main([__file__])

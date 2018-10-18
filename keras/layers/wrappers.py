@@ -698,15 +698,23 @@ class WeightDropout(Wrapper):
 
         # overwrite the weights of the wrapped layer
         # with new weights that are dropped out in training mode
-        dropped_weights = []
         for weight in self.layer.weights:
             noise_shape = K.shape(weight)
             dropped_weight = K.dropout(weight, self.rate, noise_shape, seed=self.seed)
-            dropped_weight = K.in_train_phase(dropped_weight, weight, training=training)
-
-            dropped_weights.append(dropped_weight)
-
-        self.layer.weights = dropped_weights
+            for attr in dir(self.layer):
+                if "__" in attr:
+                    # avoid accidentally calling something
+                    continue
+                if attr[0] == "_":
+                    # TODO: assuming that the variables don't begin with _
+                    # but it doesn't seem to hurt allowing these
+                    continue
+                try:
+                    val = getattr(self.layer, attr)
+                    if val == weight:
+                        setattr(self.layer, attr, dropped_weight)
+                except Exception as e:
+                    print("argh")
 
         # use wrapped layer for forward pass
         y = self.layer.call(inputs, **kwargs)
