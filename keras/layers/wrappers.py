@@ -665,7 +665,7 @@ class WeightDropout(Wrapper):
     """
 
     def __init__(self, layer, rate, seed, **kwargs):
-        layer = copy.copy(layer)
+        self.layer = layer
         super(WeightDropout, self).__init__(layer, **kwargs)
 
         self.rate = rate
