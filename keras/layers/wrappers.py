@@ -698,24 +698,38 @@ class WeightDropout(Wrapper):
 
         # overwrite the weights of the wrapped layer
         # with new weights that are dropped out in training mode
-        for weight in self.layer.weights:
-            noise_shape = K.shape(weight)
-            dropped_weight = K.dropout(weight, self.rate, noise_shape, seed=self.seed)
 
-            for attr in dir(self.layer):
-                if "__" in attr:
-                    # avoid accidentally calling something
-                    continue
-                if attr[0] == "_":
-                    # TODO: assuming that the variables don't begin with _
-                    # but it doesn't seem to hurt allowing these
-                    continue
-                try:
-                    val = getattr(self.layer, attr)
-                    if val == weight:
-                        setattr(self.layer, attr, dropped_weight)
-                except Exception as e:
-                    print("argh")
+
+        def replace_weights(weights_list):
+            new_weights = []
+            for weight in weights_list:
+                noise_shape = K.shape(weight)
+                dropped_weight = K.dropout(weight, self.rate, noise_shape, seed=self.seed)
+
+                replaced = False
+                for attr in dir(self.layer):
+                    if "__" in attr:
+                        # avoid accidentally calling something
+                        continue
+                    try:
+                        val = getattr(self.layer, attr)
+                        if val == weight:
+                            setattr(self.layer, attr, dropped_weight)
+                            replaced = True
+                    except Exception as e:
+                        print("argh")
+
+                if replaced:
+                    new_weights.append(dropped_weight)
+                else:
+                    new_weights.append(weight)
+            return new_weights
+
+        new_trainable_weights = replace_weights(self.layer.trainable_weights)
+        new_non_trainable_weights = replace_weights(self.layer.non_trainable_weights)
+
+        #setattr(self.layer, "trainable_weights", new_trainable_weights)
+        #setattr(self.layer, "non_trainable_weights", new_non_trainable_weights)
 
         # use wrapped layer for forward pass
         y = self.layer.call(inputs, **kwargs)
