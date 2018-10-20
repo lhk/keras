@@ -701,6 +701,7 @@ class WeightDropout(Wrapper):
         for weight in self.layer.weights:
             noise_shape = K.shape(weight)
             dropped_weight = K.dropout(weight, self.rate, noise_shape, seed=self.seed)
+
             for attr in dir(self.layer):
                 if "__" in attr:
                     # avoid accidentally calling something
@@ -728,3 +729,9 @@ class WeightDropout(Wrapper):
             self.layer.built = True
 
         super(WeightDropout, self).build()
+
+    def get_config(self):
+        config = {'rate': self.rate,
+                  'seed': self.seed}
+        base_config = super(WeightDropout, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
