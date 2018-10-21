@@ -12,6 +12,7 @@ from keras import backend as K
 from keras.utils.generic_utils import object_list_uid, to_list
 import tensorflow as tf
 from keras.utils.test_utils import layer_test
+from keras.initializers import RandomUniform
 
 def test_WeightDropoutAutomated():
 
@@ -46,25 +47,31 @@ def test_WeightDropout():
     model.get_config()
 
 
-    reference = Sequential()
-    reference.add(wrappers.WeightDropout(dense, rate=rate, seed=seed,
+    # test seeding behaviour
+    np.random.seed(0)
+    copy1 = Sequential()
+    copy1.add(wrappers.WeightDropout(layers.Dense(1, bias_initializer=RandomUniform(seed=seed)), rate=rate, seed=seed,
                                          input_shape=(40,)))
-    reference.add(layers.Activation('relu'))
-    reference.compile(optimizer='rmsprop', loss='mse')
-    reference.fit(np.random.random((10, 40)), np.random.random((10, 2)),
+    copy1.compile(optimizer='rmsprop', loss='mse')
+    copy1.fit(np.random.random((10, 40)), np.random.random((10, 1)),
+              epochs=1,
+              batch_size=10)
+
+    np.random.seed(0)
+    copy2 = Sequential()
+    copy2.add(wrappers.WeightDropout(layers.Dense(1, bias_initializer=RandomUniform(seed=seed)), rate=rate, seed=seed,
+                                         input_shape=(40,)))
+    copy2.compile(optimizer='rmsprop', loss='mse')
+    copy2.fit(np.random.random((10, 40)), np.random.random((10, 1)),
               epochs=1,
               batch_size=10)
 
 
     # test when specifying a batch_input_shape
-    test_input = np.random.random((100, 40))
-
-    reference_weights = reference.layers[0].get_weights()
-    model.layers[0].set_weights(reference_weights)
-
-    model_output = model.predict(test_input)
-    reference_output = reference.predict(test_input)
-    assert_allclose(model_output, reference_output, atol=1e-05)
+    test_input = np.random.rand(1000,40)
+    output1 = copy1.predict(test_input)
+    output2 = copy2.predict(test_input)
+    assert_allclose(output1, output2, atol=1e-05)
 
 
     # now set learning phase and check if weights are dropped
